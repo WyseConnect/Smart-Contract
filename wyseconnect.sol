@@ -1,114 +1,85 @@
 /**
- *Submitted for verification at BscScan.com on 2024-09-04
+ *Submitted for verification at BscScan.com on 2024-09-09
 */
 
 // SPDX-License-Identifier: MIT
-
-/* 
-
-Telegram: https://t.me/wyseconnect
-Website: https://wyseconnect
-Twitter: https://x.com/wyseconnect
-
- */
-
 pragma solidity ^0.8.26;
 
-abstract contract Context {
-    function _msgSender() internal view virtual returns (address) {
-        return msg.sender;
-    }
+interface IUniswapV2Factory {
+    function createPair(address tokenA, address tokenB) external returns (address pair);
+}
+
+interface IUniswapV2Router01 {
+    function factory() external pure returns (address);
+    function WETH() external pure returns (address);
+    function addLiquidityETH(
+        address token,
+        uint amountTokenDesired,
+        uint amountTokenMin,
+        uint amountETHMin,
+        address to,
+        uint deadline
+    ) external payable returns (uint amountToken, uint amountETH, uint liquidity);
+}
+
+interface IUniswapV2Router02 is IUniswapV2Router01 {
+    function swapExactTokensForETHSupportingFeeOnTransferTokens(
+        uint amountIn,
+        uint amountOutMin,
+        address[] calldata path,
+        address to,
+        uint deadline
+    ) external;
 }
 
 interface IERC20 {
     function totalSupply() external view returns (uint256);
-
     function balanceOf(address account) external view returns (uint256);
-
-    function transfer(address recipient, uint256 amount)
-        external
-        returns (bool);
-
-    function allowance(address owner, address spender)
-        external
-        view
-        returns (uint256);
-
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
     function approve(address spender, uint256 amount) external returns (bool);
-
     function transferFrom(
         address sender,
         address recipient,
         uint256 amount
     ) external returns (bool);
 
-    function burn(uint256 amount) external;
-
     event Transfer(address indexed from, address indexed to, uint256 value);
-    event Approval(
-        address indexed owner,
-        address indexed spender,
-        uint256 value
-    );
-    event Burn(address indexed burner, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 
-library SafeMath {
-    function add(uint256 a, uint256 b) internal pure returns (uint256) {
-        uint256 c = a + b;
-        require(c >= a, "SafeMath: addition overflow");
-        return c;
-    }
+interface IERC20Metadata is IERC20 {
+    function name() external view returns (string memory);
+    function symbol() external view returns (string memory);
+    function decimals() external view returns (uint8);
+}
 
-    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
-        return sub(a, b, "SafeMath: subtraction overflow");
-    }
-
-    function sub(
-        uint256 a,
-        uint256 b,
-        string memory errorMessage
-    ) internal pure returns (uint256) {
-        require(b <= a, errorMessage);
-        uint256 c = a - b;
-        return c;
-    }
-
-    function mul(uint256 a, uint256 b) internal pure returns (uint256) {
-        if (a == 0) {
-            return 0;
-        }
-        uint256 c = a * b;
-        require(c / a == b, "SafeMath: multiplication overflow");
-        return c;
-    }
-
-    function div(uint256 a, uint256 b) internal pure returns (uint256) {
-        return div(a, b, "SafeMath: division by zero");
-    }
-
-    function div(
-        uint256 a,
-        uint256 b,
-        string memory errorMessage
-    ) internal pure returns (uint256) {
-        require(b > 0, errorMessage);
-        uint256 c = a / b;
-        return c;
+library Address {
+    function sendValue(address payable recipient, uint256 amount) internal {
+        require(address(this).balance >= amount, "Address: insufficient balance");
+        (bool success, ) = recipient.call{value: amount}("");
+        require(success, "Address: unable to send value, recipient may have reverted");
     }
 }
 
-contract Ownable is Context {
+abstract contract Context {
+    function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+    function _msgData() internal view virtual returns (bytes calldata) {
+        return msg.data;
+    }
+}
+
+abstract contract Ownable is Context {
     address private _owner;
-    event OwnershipTransferred(
-        address indexed previousOwner,
-        address indexed newOwner
-    );
 
-    constructor() {
-        address msgSender = _msgSender();
-        _owner = msgSender;
-        emit OwnershipTransferred(address(0), msgSender);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    constructor () {
+        _owner = _msgSender();
+        emit OwnershipTransferred(address(0), _owner);
     }
 
     function owner() public view returns (address) {
@@ -124,139 +95,57 @@ contract Ownable is Context {
         emit OwnershipTransferred(_owner, address(0));
         _owner = address(0);
     }
+
+    function transferOwnership(address newOwner) public virtual onlyOwner {
+        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        emit OwnershipTransferred(_owner, newOwner);
+        _owner = newOwner;
+    }
 }
 
-interface IUniswapV2Factory {
-    function createPair(address tokenA, address tokenB)
-        external
-        returns (address pair);
-}
-
-interface IUniswapV2Router02 {
-    function swapExactTokensForETHSupportingFeeOnTransferTokens(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external;
-
-    function factory() external pure returns (address);
-
-    function WETH() external pure returns (address);
-
-    function addLiquidityETH(
-        address token,
-        uint256 amountTokenDesired,
-        uint256 amountTokenMin,
-        uint256 amountETHMin,
-        address to,
-        uint256 deadline
-    )
-        external
-        payable
-        returns (
-            uint256 amountToken,
-            uint256 amountETH,
-            uint256 liquidity
-        );
-}
-
-contract WYSECONNECT is Context, IERC20, Ownable {
-    using SafeMath for uint256;
+contract ERC20 is Context, IERC20, IERC20Metadata {
     mapping(address => uint256) private _balances;
     mapping(address => mapping(address => uint256)) private _allowances;
-    mapping(address => bool) private _isExcludedFromFee;
-    mapping(address => uint256) private _holderLastTransferTimestamp;
-    bool public transferDelayEnabled = true;
-    address payable private _taxWallet;
 
-    uint64 private lastLiquifyTime;
+    uint256 private _totalSupply;
+    string private _name;
+    string private _symbol;
 
-    uint256 private _initialBuyTax = 3;
-    uint256 private _initialSellTax = 3;
-    uint256 private _finalBuyTax = 0;
-    uint256 private _finalSellTax = 0;
-    uint256 private _reduceBuyTaxAt = 3;
-    uint256 private _reduceSellTaxAt = 3;
-    uint256 private _preventSwapBefore = 5;
-    uint256 private _buyCount = 0;
-
-    uint8 private constant _decimals = 18;
-    uint256 private _tTotal = 100000000000 * 10**_decimals;
-    string private constant _name = unicode"Wyse Connect";
-    string private constant _symbol = unicode"WYSE";
-    uint256 public _maxTxAmount = 300000000 * 10**_decimals;
-    uint256 public _maxWalletSize = 300000000 * 10**_decimals;
-    uint256 public _taxSwapThreshold = 400000000 * 10**_decimals;
-    uint256 public _maxTaxSwap = 300000000 * 10**_decimals;
-    
-
-    IUniswapV2Router02 private uniswapV2Router;
-    address private uniswapV2Pair;
-    bool private tradingOpen;
-    bool private inSwap = false;
-    bool private swapEnabled = false;
-
-    event MaxTxAmountUpdated(uint256 _maxTxAmount);
-    modifier lockTheSwap() {
-        inSwap = true;
-        _;
-        inSwap = false;
+    constructor(string memory name_, string memory symbol_) {
+        _name = name_;
+        _symbol = symbol_;
     }
 
-    constructor() {
-        _taxWallet = payable(0x7254dAF19ba2362c13Dc2e5D175f5e787D5A9874);
-        _balances[_msgSender()] = _tTotal;
-        _isExcludedFromFee[owner()] = true;
-        _isExcludedFromFee[address(this)] = true;
-
-        emit Transfer(address(0), _msgSender(), _tTotal);
-    }
-
-    function name() public pure returns (string memory) {
+    function name() public view virtual override returns (string memory) {
         return _name;
     }
 
-    function symbol() public pure returns (string memory) {
+    function symbol() public view virtual override returns (string memory) {
         return _symbol;
     }
 
-    function decimals() public pure returns (uint8) {
-        return _decimals;
+    function decimals() public view virtual override returns (uint8) {
+        return 9;
     }
 
-    function totalSupply() external view returns (uint256) {
-        return _tTotal;
+    function totalSupply() public view virtual override returns (uint256) {
+        return _totalSupply;
     }
 
-    function balanceOf(address account) public view override returns (uint256) {
+    function balanceOf(address account) public view virtual override returns (uint256) {
         return _balances[account];
     }
 
-    function transfer(address recipient, uint256 amount)
-        public
-        override
-        returns (bool)
-    {
+    function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
         _transfer(_msgSender(), recipient, amount);
         return true;
     }
 
-    function allowance(address owner, address spender)
-        public
-        view
-        override
-        returns (uint256)
-    {
+    function allowance(address owner, address spender) public view virtual override returns (uint256) {
         return _allowances[owner][spender];
     }
 
-    function approve(address spender, uint256 amount)
-        public
-        override
-        returns (bool)
-    {
+    function approve(address spender, uint256 amount) public virtual override returns (bool) {
         _approve(_msgSender(), spender, amount);
         return true;
     }
@@ -265,186 +154,303 @@ contract WYSECONNECT is Context, IERC20, Ownable {
         address sender,
         address recipient,
         uint256 amount
-    ) public override returns (bool) {
+    ) public virtual override returns (bool) {
+        uint256 currentAllowance = _allowances[sender][_msgSender()];
+        require(currentAllowance >= amount, "ERC20: transfer amount exceeds allowance");
+        unchecked {
+            _approve(sender, _msgSender(), currentAllowance - amount);
+        }
+
         _transfer(sender, recipient, amount);
-        _approve(
-            sender,
-            _msgSender(),
-            _allowances[sender][_msgSender()].sub(
-                amount,
-                "ERC20: transfer amount exceeds allowance"
-            )
-        );
         return true;
     }
 
-    function burn(uint256 amount) public override {
-        require(amount > 0, "Burn amount must be greater than zero");
-        require(_balances[_msgSender()] >= amount, "Insufficient balance to burn");
+    function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
+        _approve(_msgSender(), spender, _allowances[_msgSender()][spender] + addedValue);
+        return true;
+    }
 
-        _balances[_msgSender()] = _balances[_msgSender()].sub(amount);
-        _tTotal = _tTotal.sub(amount);
+    function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
+        uint256 currentAllowance = _allowances[_msgSender()][spender];
+        require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
+        unchecked {
+            _approve(_msgSender(), spender, currentAllowance - subtractedValue);
+        }
+        return true;
+    }
 
-        emit Burn(_msgSender(), amount);
-        emit Transfer(_msgSender(), address(0), amount);
+    function _transfer(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) internal virtual {
+        require(sender != address(0), "ERC20: transfer from the zero address");
+        require(recipient != address(0), "ERC20: transfer to the zero address");
+
+        uint256 senderBalance = _balances[sender];
+        require(senderBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[sender] = senderBalance - amount;
+        }
+        _balances[recipient] += amount;
+
+        emit Transfer(sender, recipient, amount);
+    }
+
+    function _mintOnce(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: mint to the zero address");
+
+        _totalSupply += amount;
+        _balances[account] += amount;
+        emit Transfer(address(0), account, amount);
+    }
+
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            _balances[account] = accountBalance - amount;
+        }
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
     }
 
     function _approve(
         address owner,
         address spender,
         uint256 amount
-    ) private {
+    ) internal virtual {
         require(owner != address(0), "ERC20: approve from the zero address");
         require(spender != address(0), "ERC20: approve to the zero address");
+
         _allowances[owner][spender] = amount;
         emit Approval(owner, spender, amount);
     }
+}
 
-    function _transfer(
-        address from,
-        address to,
-        uint256 amount
-    ) private {
-        require(from != address(0), "ERC20: transfer from the zero address");
-        require(to != address(0), "ERC20: transfer to the zero address");
-        require(amount > 0, "Transfer amount must be greater than zero");
-        uint256 taxAmount = 0;
+contract WYSECONNECT is ERC20, Ownable {
+    using Address for address payable;
+    bool public tradingEnabled;
+    IUniswapV2Router02 public uniswapV2Router;
+    address public uniswapV2Pair;
 
-        if (from != owner() && to != owner()) {
-            taxAmount = amount
-                .mul(
-                    (_buyCount > _reduceBuyTaxAt)
-                        ? _finalBuyTax
-                        : _initialBuyTax
-                )
-                .div(100);
+    mapping(address => bool) private _isExcludedFromFees;
 
-            if (transferDelayEnabled) {
-                if (
-                    to != address(uniswapV2Router) &&
-                    to != address(uniswapV2Pair)
-                ) {
-                    require(
-                        _holderLastTransferTimestamp[tx.origin] < block.number,
-                        "_transfer:: Transfer Delay enabled.  Only one purchase per block allowed."
-                    );
-                    _holderLastTransferTimestamp[tx.origin] = block.number;
-                }
-            }
+    uint256 public feeOnBuy;
+    uint256 public feeOnSell;
+    uint256 public feeOnTransfer;
 
-            if (
-                from == uniswapV2Pair &&
-                to != address(uniswapV2Router) &&
-                !_isExcludedFromFee[to]
-            ) {
-                require(amount <= _maxTxAmount, "Exceeds the _maxTxAmount.");
-                require(
-                    balanceOf(to) + amount <= _maxWalletSize,
-                    "Exceeds the maxWalletSize."
-                );
-                _buyCount++;
-            }
+    uint256 public maxBuyFee;
+    uint256 public maxSellFee;
+    uint256 public totalFeeLimit;
 
-            if (to == uniswapV2Pair && from != address(this)) {
-                taxAmount = amount
-                    .mul(
-                        (_buyCount > _reduceSellTaxAt)
-                            ? _finalSellTax
-                            : _initialSellTax
-                    )
-                    .div(100);
-            }
+    address public feeReceiver;
+    uint256 public swapTokensAtAmount;
+    bool private swapping;
+    bool public swapEnabled;
 
-            uint256 contractTokenBalance = balanceOf(address(this));
-            if (
-                !inSwap &&
-                to == uniswapV2Pair &&
-                swapEnabled &&
-                contractTokenBalance > _taxSwapThreshold &&
-                _buyCount > _preventSwapBefore &&
-                lastLiquifyTime != uint64(block.number)
-            ) {
-                swapTokensForEth(
-                    min(amount, min(contractTokenBalance, _maxTaxSwap))
-                );
-                uint256 contractETHBalance = address(this).balance;
-                if (contractETHBalance > 50000000000000000) {
-                    sendETHToFee(address(this).balance);
-                }
-            }
+    event ExcludeFromFees(address indexed account, bool isExcluded);
+    event SwapAndSendFee(uint256 tokensSwapped, uint256 bnbSend);
+    event SwapTokensAtAmountUpdated(uint256 swapTokensAtAmount);
+    event FeeReceiverChanged(address feeReceiver);
+    event TradingEnabled(bool tradingEnabled);
+    event BuyFeeUpdated(uint256 newFee);
+    event SellFeeUpdated(uint256 newFee);
+
+    constructor() ERC20("Wyse Connect", "WYSE") {
+        address router;
+        address pinkLock;
+
+        if (block.chainid == 56) {
+            router = 0x10ED43C718714eb63d5aA57B78B54704E256024E; // BSC Pancake Mainnet Router
+            pinkLock = 0x407993575c91ce7643a4d4cCACc9A98c36eE1BBE; // BSC PinkLock
+        } else if (block.chainid == 97) {
+            router = 0xD99D1c33F9fC3444f8101754aBC46c52416550D1; // BSC Pancake Testnet Router
+            pinkLock = 0x5E5b9bE5fd939c578ABE5800a90C566eeEbA44a5; // BSC Testnet PinkLock
+        } else if (block.chainid == 1 || block.chainid == 5) {
+            router = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D; // ETH Uniswap Mainnet & Testnet
+            pinkLock = 0x71B5759d73262FBb223956913ecF4ecC51057641; // ETH PinkLock
+        } else {
+            revert("Unsupported network");
         }
 
-        if (taxAmount > 0) {
-            _balances[address(this)] = _balances[address(this)].add(taxAmount);
-            emit Transfer(from, address(this), taxAmount);
+        IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(router);
+        address _uniswapV2Pair = IUniswapV2Factory(_uniswapV2Router.factory())
+            .createPair(address(this), _uniswapV2Router.WETH());
+
+        uniswapV2Router = _uniswapV2Router;
+        uniswapV2Pair = _uniswapV2Pair;
+
+        _approve(address(this), address(uniswapV2Router), type(uint256).max);
+
+        feeOnBuy = 3;
+        feeOnSell = 3;
+        feeOnTransfer = 0;
+        maxBuyFee = 5;
+        maxSellFee = 5;
+        totalFeeLimit = 10; // Max allowed total fee (buy + sell)
+
+        feeReceiver = 0x35415EB9AF58BF0dab900F2D8056C54373f43731;
+
+        _isExcludedFromFees[owner()] = true;
+        _isExcludedFromFees[address(0xdead)] = true;
+        _isExcludedFromFees[address(this)] = true;
+        _isExcludedFromFees[pinkLock] = true;
+
+        _mintOnce(owner(), 1e11 * (10 ** decimals()));
+        swapTokensAtAmount = totalSupply() / 5_000;
+        swapEnabled = false;
+    }
+
+    receive() external payable {}
+
+    function creator() public pure returns (string memory) {
+        return "x.com/wyseconnect";
+    }
+
+    function claimStuckTokens(address token) external onlyOwner {
+        require(token != address(this), "WYSE: Owner cannot claim contract's balance of its own tokens");
+        if (token == address(0)) {
+            payable(msg.sender).sendValue(address(this).balance);
+        } else {
+            IERC20(token).transfer(msg.sender, IERC20(token).balanceOf(address(this)));
         }
-        _balances[from] = _balances[from].sub(amount);
-        _balances[to] = _balances[to].add(amount.sub(taxAmount));
-        emit Transfer(from, to, amount.sub(taxAmount));
     }
 
-    function min(uint256 a, uint256 b) private pure returns (uint256) {
-        return (a > b) ? b : a;
+    function claimStuckBNB() external onlyOwner {
+        uint256 contractBalance = address(this).balance;
+        require(contractBalance > 0, "WYSE: No BNB to claim");
+        payable(owner()).sendValue(contractBalance);
     }
 
-    function swapTokensForEth(uint256 tokenAmount) private lockTheSwap {
-        lastLiquifyTime = uint64(block.number);
+    function excludeFromFees(address account, bool excluded) external onlyOwner {
+        _isExcludedFromFees[account] = excluded;
+        emit ExcludeFromFees(account, excluded);
+    }
+
+    function isExcludedFromFees(address account) public view returns (bool) {
+        return _isExcludedFromFees[account];
+    }
+
+    function changeFeeReceiver(address _feeReceiver) external onlyOwner {
+        require(_feeReceiver != address(0), "WYSE: Fee receiver cannot be the zero address");
+        feeReceiver = _feeReceiver;
+        emit FeeReceiverChanged(feeReceiver);
+    }
+
+    function enableTrading() external onlyOwner {
+        require(!tradingEnabled, "WYSE: Trading already enabled.");
+        tradingEnabled = true;
+        swapEnabled = true;
+        emit TradingEnabled(tradingEnabled);
+    }
+
+    function setSwapTokensAtAmount(uint256 newAmount, bool _swapEnabled) external onlyOwner {
+        require(newAmount > totalSupply() / 1_000_000, "WYSE: SwapTokensAtAmount must be greater than 0.0001% of total supply");
+        swapTokensAtAmount = newAmount;
+        swapEnabled = _swapEnabled;
+        emit SwapTokensAtAmountUpdated(swapTokensAtAmount);
+    }
+
+    function setBuyFee(uint256 newBuyFee) external onlyOwner {
+        require(newBuyFee <= maxBuyFee, "WYSE: Buy fee exceeds maximum allowed");
+        require(newBuyFee + feeOnSell <= totalFeeLimit, "WYSE: Total fee limit exceeded");
+        feeOnBuy = newBuyFee;
+        emit BuyFeeUpdated(newBuyFee);
+    }
+
+    function setSellFee(uint256 newSellFee) external onlyOwner {
+        require(newSellFee <= maxSellFee, "WYSE: Sell fee exceeds maximum allowed");
+        require(feeOnBuy + newSellFee <= totalFeeLimit, "WYSE: Total fee limit exceeded");
+        feeOnSell = newSellFee;
+        emit SellFeeUpdated(newSellFee);
+    }
+
+    function adjustFees(uint256 newBuyFee, uint256 newSellFee) external onlyOwner {
+        // Validate new fees
+        require(newBuyFee <= maxBuyFee, "WYSE: Buy fee exceeds maximum allowed");
+        require(newSellFee <= maxSellFee, "WYSE: Sell fee exceeds maximum allowed");
+        require(newBuyFee + newSellFee <= totalFeeLimit, "WYSE: Total fee limit exceeded");
+
+        // Update fees
+        feeOnBuy = newBuyFee;
+        feeOnSell = newSellFee;
+
+        // Emit events for fee updates
+        emit BuyFeeUpdated(newBuyFee);
+        emit SellFeeUpdated(newSellFee);
+    }
+
+    function _transfer(address from, address to, uint256 amount) internal override {
+        require(from != address(0), "WYSE: transfer from the zero address");
+        require(to != address(0), "WYSE: transfer to the zero address");
+        require(tradingEnabled || _isExcludedFromFees[from] || _isExcludedFromFees[to], "WYSE: Trading not yet enabled!");
+
+        if (amount == 0) {
+            super._transfer(from, to, 0);
+            return;
+        }
+
+        uint256 contractTokenBalance = balanceOf(address(this));
+        bool canSwap = contractTokenBalance >= swapTokensAtAmount;
+
+        if (canSwap &&
+            !swapping &&
+            to == uniswapV2Pair &&
+            (feeOnBuy + feeOnSell > 0) &&
+            !_isExcludedFromFees[from] &&
+            swapEnabled
+        ) {
+            swapping = true;
+            swapAndSendFee(contractTokenBalance);
+            swapping = false;
+        }
+
+        uint256 _totalFees = _isExcludedFromFees[from] || _isExcludedFromFees[to] || swapping ? 0 : (from == uniswapV2Pair ? feeOnBuy : (to == uniswapV2Pair ? feeOnSell : feeOnTransfer));
+
+        if (_totalFees > 0) {
+            uint256 fees = (amount * _totalFees) / 100;
+            amount -= fees;
+            super._transfer(from, address(this), fees);
+        }
+
+        super._transfer(from, to, amount);
+    }
+
+    function swapAndSendFee(uint256 tokenAmount) private {
+        uint256 initialBalance = address(this).balance;
+        address[] memory path = new address[](2);
         path[0] = address(this);
         path[1] = uniswapV2Router.WETH();
-        _approve(address(this), address(uniswapV2Router), tokenAmount);
-        uniswapV2Router.swapExactTokensForETHSupportingFeeOnTransferTokens(
+
+        try uniswapV2Router.swapExactTokensForETHSupportingFeeOnTransferTokens(
             tokenAmount,
             0,
             path,
-            _taxWallet,
+            address(this),
             block.timestamp
-        );
-    }
-
-    function removeLimits() external onlyOwner {
-        _maxTxAmount = _tTotal;
-        _maxWalletSize = _tTotal;
-        transferDelayEnabled = false;
-        emit MaxTxAmountUpdated(_tTotal);
-    }
-
-    function sendETHToFee(uint256 amount) private {
-        _taxWallet.transfer(amount);
-    }
-
-    address[] public path;
-
-function openTrading() external onlyOwner {
-    require(!tradingOpen, "Trading is already open");
-    uniswapV2Router =  IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E);
-    _approve(address(this), address(uniswapV2Router), _tTotal);
-    uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory()).createPair(address(this), uniswapV2Router.WETH());
-    uniswapV2Router.addLiquidityETH{value: address(this).balance}(address(this), balanceOf(address(this)), 0, 0, owner(), block.timestamp);
-    IERC20(uniswapV2Pair).approve(address(uniswapV2Router), type(uint256).max);
-    swapEnabled = true;
-    tradingOpen = true;
-    lastLiquifyTime = uint64(block.number);
-
-    path = new address[](2);
-    path[0] = address(this);
-    path[1] = uniswapV2Router.WETH();
-}
-
-    receive() external payable {}
-    
-    function ManualSwap() external {
-        require(_msgSender() == _taxWallet);
-        uint256 tokenBalance = balanceOf(address(this));
-        if (tokenBalance > 0) {
-            swapTokensForEth(tokenBalance);
+        ) {} catch {
+            return;
         }
-        uint256 ethBalance = address(this).balance;
-        sendETHToFee(ethBalance);
+
+        uint256 newBalance = address(this).balance - initialBalance;
+        payable(feeReceiver).sendValue(newBalance);
+        emit SwapAndSendFee(tokenAmount, newBalance);
     }
 
-    function withdrawBNB() public onlyOwner {
-        uint256 contractBNBBalance = address(this).balance;
-        require(contractBNBBalance > 0, "No ETH available for withdrawal");
-        _taxWallet.transfer(contractBNBBalance);
+    function burn(uint256 amount) external onlyOwner {
+        _burn(_msgSender(), amount);
+    }
+
+    function burnFrom(address account, uint256 amount) external onlyOwner {
+        uint256 currentAllowance = allowance(account, _msgSender());
+        require(currentAllowance >= amount, "ERC20: burn amount exceeds allowance");
+        unchecked {
+            _approve(account, _msgSender(), currentAllowance - amount);
+        }
+        _burn(account, amount);
     }
 }
